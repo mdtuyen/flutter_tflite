@@ -1,13 +1,14 @@
+// ignore_for_file: unnecessary_null_comparison
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image/image.dart' as img;
-
 import 'package:tflite/tflite.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 
 void main() => runApp(new App());
 
@@ -32,25 +33,24 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  File _image;
-  List _recognitions;
+  late File _image;
+  late List _recognitions;
   String _model = mobile;
-  double _imageHeight;
-  double _imageWidth;
+  late double _imageHeight;
+  late double _imageWidth;
   bool _busy = false;
 
   Future predictImagePicker() async {
-    var image = await ImagePicker.pickImage(source: ImageSource.gallery);
+    var imagePicker = ImagePicker();
+    var image = await imagePicker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
     setState(() {
       _busy = true;
     });
-    predictImage(image);
+    predictImage(image as File);
   }
 
   Future predictImage(File image) async {
-    if (image == null) return;
-
     switch (_model) {
       case yolo:
         await yolov2Tiny(image);
@@ -66,7 +66,7 @@ class _MyAppState extends State<MyApp> {
         break;
       default:
         await recognizeImage(image);
-      // await recognizeImageBinary(image);
+    // await recognizeImageBinary(image);
     }
 
     new FileImage(image)
@@ -100,7 +100,7 @@ class _MyAppState extends State<MyApp> {
   Future loadModel() async {
     Tflite.close();
     try {
-      String res;
+      String? res;
       switch (_model) {
         case yolo:
           res = await Tflite.loadModel(
@@ -183,7 +183,7 @@ class _MyAppState extends State<MyApp> {
       imageStd: 127.5,
     );
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions!;
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -192,15 +192,15 @@ class _MyAppState extends State<MyApp> {
   Future recognizeImageBinary(File image) async {
     int startTime = new DateTime.now().millisecondsSinceEpoch;
     var imageBytes = (await rootBundle.load(image.path)).buffer;
-    img.Image oriImage = img.decodeJpg(imageBytes.asUint8List());
-    img.Image resizedImage = img.copyResize(oriImage, height: 224, width: 224);
+    img.Image? oriImage = img.decodeJpg(imageBytes.asUint8List());
+    img.Image resizedImage = img.copyResize(oriImage!, height: 224, width: 224);
     var recognitions = await Tflite.runModelOnBinary(
       binary: imageToByteListFloat32(resizedImage, 224, 127.5, 127.5),
       numResults: 6,
       threshold: 0.05,
     );
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions!;
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -226,7 +226,7 @@ class _MyAppState extends State<MyApp> {
     //   numResultsPerClass: 1,
     // );
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions!;
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -246,7 +246,7 @@ class _MyAppState extends State<MyApp> {
     //   numResultsPerClass: 1,
     // );
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions!;
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -261,7 +261,7 @@ class _MyAppState extends State<MyApp> {
     );
 
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions!;
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}");
@@ -277,7 +277,7 @@ class _MyAppState extends State<MyApp> {
     print(recognitions);
 
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions!;
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -287,22 +287,14 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _busy = true;
       _model = model;
-      _recognitions = null;
+      _recognitions = [];
     });
     await loadModel();
 
-    if (_image != null)
-      predictImage(_image);
-    else
-      setState(() {
-        _busy = false;
-      });
+    predictImage(_image);
   }
 
   List<Widget> renderBoxes(Size screen) {
-    if (_recognitions == null) return [];
-    if (_imageHeight == null || _imageWidth == null) return [];
-
     double factorX = screen.width;
     double factorY = _imageHeight / _imageWidth * screen.width;
     Color blue = Color.fromRGBO(37, 213, 253, 1.0);
@@ -334,9 +326,6 @@ class _MyAppState extends State<MyApp> {
   }
 
   List<Widget> renderKeypoints(Size screen) {
-    if (_recognitions == null) return [];
-    if (_imageHeight == null || _imageWidth == null) return [];
-
     double factorX = screen.width;
     double factorY = _imageHeight / _imageWidth * screen.width;
 
@@ -371,7 +360,7 @@ class _MyAppState extends State<MyApp> {
     Size size = MediaQuery.of(context).size;
     List<Widget> stackChildren = [];
 
-    if (_model == deeplab && _recognitions != null) {
+    if (_model == deeplab) {
       stackChildren.add(Positioned(
         top: 0.0,
         left: 0.0,
@@ -379,12 +368,13 @@ class _MyAppState extends State<MyApp> {
         child: _image == null
             ? Text('No image selected.')
             : Container(
-                decoration: BoxDecoration(
-                    image: DecorationImage(
-                        alignment: Alignment.topCenter,
-                        image: MemoryImage(_recognitions),
-                        fit: BoxFit.fill)),
-                child: Opacity(opacity: 0.3, child: Image.file(_image))),
+            decoration: BoxDecoration(
+                image: DecorationImage(
+                    alignment: Alignment.topCenter,
+                    image: MemoryImage(Uint8List.fromList(
+                        _recognitions.map<int>((e) => e as int).toList())),
+                    fit: BoxFit.fill)),
+            child: Opacity(opacity: 0.3, child: Image.file(_image))),
       ));
     } else {
       stackChildren.add(Positioned(
@@ -400,15 +390,15 @@ class _MyAppState extends State<MyApp> {
         child: Column(
           children: _recognitions != null
               ? _recognitions.map((res) {
-                  return Text(
-                    "${res["index"]} - ${res["label"]}: ${res["confidence"].toStringAsFixed(3)}",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 20.0,
-                      background: Paint()..color = Colors.white,
-                    ),
-                  );
-                }).toList()
+            return Text(
+              "${res["index"]} - ${res["label"]}: ${res["confidence"].toStringAsFixed(3)}",
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 20.0,
+                background: Paint()..color = Colors.white,
+              ),
+            );
+          }).toList()
               : [],
         ),
       ));
