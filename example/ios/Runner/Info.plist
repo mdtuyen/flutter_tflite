@@ -47,5 +47,9 @@
 	<string>We need your permission to use phone camera</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need your permission to use microsphone</string>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 </dict>
 </plist>
